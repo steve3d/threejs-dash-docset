@@ -1,0 +1,12 @@
+:root {
+	--panel-width: 24px;
+	--max-width: 1024px;
+}
+
+#button {
+	display: none
+}
+
+#panel {
+	display: none
+}
