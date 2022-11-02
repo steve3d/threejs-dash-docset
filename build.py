@@ -50,8 +50,9 @@ class Builder:
             shutil.rmtree(path.join(output, 'docs', name, removeLang))
 
     def _parse(self):
-        with open(path.join(self.cwd, 'output', 'docs', 'list.js'), encoding='utf-8') as f:
-            pages = f.read().replace('var list =', '')        
+        # now use list.json instead
+        with open(path.join(self.cwd, 'output', 'docs', 'list.json'), encoding='utf-8') as f:
+            pages = f.read()      
 
         self.items = dirtyjson.loads(pages)[self.lang]
 
@@ -77,6 +78,7 @@ class Builder:
         with open(path.join(self.cwd, 'output', 'docs', 'page.js'), 'r+', encoding='utf-8') as f:
             content = f.read().replace(r"pathname.substring( 0, pathname.indexOf( 'docs' ) + 4 ) + '/prettify", "'prettify")
             content = content.replace('../examples/#$1', '../examples/$1.html')
+            content = content.replace('window.location.replace(','// window.location.replace(') # prevent loading crash
             f.seek(0, 0)
             f.truncate()
             f.write(content)
@@ -100,6 +102,7 @@ class Builder:
         for group in groups.items():
             for item in group[1].items():
                 items.append((item[0], type, 'docs/' + item[1] + '.html'))
+                # items.append((item[0], type, 'https://threejs.org/docs/' + item[1] + '.html'))
 
         cursor.executemany("INSERT INTO searchIndex(name, type, path) VALUES (?, ?, ?)", items)
 
@@ -110,6 +113,8 @@ class Builder:
         self._copy()
         self._parse()
         self._index()
+        # debug sqlite
+        # shutil.copy2(path.join(self.cwd, 'threejs.docset/Contents/Resources/docSet.dsidx'), path.join(self.cwd, 'threejs.docset/Contents/Resources/docSet.db'))
         print('Build documents for version: ' + self.version)
         pass
 
