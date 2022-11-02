@@ -11,6 +11,9 @@ import dirtyjson
 import sqlite3
 import glob
 
+
+
+
 class Builder:
     def __init__(self, lang, version):
         self.lang = lang
@@ -78,7 +81,7 @@ class Builder:
         with open(path.join(self.cwd, 'output', 'docs', 'page.js'), 'r+', encoding='utf-8') as f:
             content = f.read().replace(r"pathname.substring( 0, pathname.indexOf( 'docs' ) + 4 ) + '/prettify", "'prettify")
             content = content.replace('../examples/#$1', '../examples/$1.html')
-            content = content.replace('window.location.replace(','// window.location.replace(') # prevent loading crash
+            content = content.replace('window.location.replace(','// window.location.replace(') # prevent loading crash fixme: need a better fix
             f.seek(0, 0)
             f.truncate()
             f.write(content)
@@ -95,6 +98,45 @@ class Builder:
             items.append((filename.replace('.html', ''), 'Sample', 'examples/' + filename))
 
         cursor.executemany("INSERT INTO searchIndex(name, type, path) VALUES (?, ?, ?)", items)
+
+    def _gen_api_toc(self):
+        for item in glob.glob(path.join('threejs.docset', 'Contents', 'Resources', 'Documents', 'docs/api/en/**/*.html')): #'docs/api/en/**/**/*.html')):
+            print('gen toc for:'+item)
+            with open(item, 'r+', encoding='utf-8') as f:
+                filename = path.basename(item) 
+                name = filename.replace('.html', '')
+
+                content = f.read()
+
+                # toc
+                def repl_toc_fn(matchobj):
+                    # g0 = matchobj.group(0)
+                    (g1,g2,g3,g0) = matchobj.group(2,3,4,1)
+                    # g1 返回值
+                    # g2 名称
+                    # g3 类型
+                    if g1 is None:
+                        g1 = ''
+                    if g2 is None:
+                        g2 = ''
+                    if g3 is None:
+                        g3 = ''
+                    if g0 is None:
+                        g0 = ''
+                    else:
+                        # uppercase g0's first letter
+                        g0 = g0[0].upper() + g0[1:]
+                    # g2 = matchobj.group(2)
+                    # print(g0,g1,g2,g3)
+                    # return g1+g2+g3
+                    return '<a onclick="window.parent.setUrlFragment(\'' + name + '.'+g2+'\')" target="_parent" title="' + name + '.'+g2+'" class="permalink">#</a> .<a onclick="window.parent.setUrlFragment(\'' + name + '.'+g2+'\')" id="'+g2+'">'+g2+'</a> '+g3+' : <a name="//apple_ref/cpp/'+g0+'/'+g2+'" class="param dashAnchor" onclick="window.parent.setUrlFragment(\''+g1+'\')">'+g1+'</a>'
+
+                content_new = re.sub(r"\[(member|property|method):([\w]+) ([\w\.\s]+)\]\s*(\(.*\))?", repl_toc_fn, content, flags=re.M)
+                
+                f.seek(0, 0)
+                f.truncate()
+                f.write(content_new)
+                # print(content_new)
         
 
     def _index_group(self, groups, type, cursor):
@@ -113,6 +155,8 @@ class Builder:
         self._copy()
         self._parse()
         self._index()
+        # generate TOC
+        self._gen_api_toc()
         # debug sqlite
         # shutil.copy2(path.join(self.cwd, 'threejs.docset/Contents/Resources/docSet.dsidx'), path.join(self.cwd, 'threejs.docset/Contents/Resources/docSet.db'))
         print('Build documents for version: ' + self.version)
