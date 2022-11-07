@@ -90,6 +90,8 @@ class Builder:
         shutil.copy2(path.join(self.cwd, 'assets', 'icon@2x.png'), path.join(self.cwd, 'threejs.docset'))
         shutil.copy2(path.join(self.cwd, 'assets', 'info.plist'), path.join(self.cwd, 'threejs.docset', 'Contents'))
         shutil.move(path.join(self.cwd, 'output'), path.join('threejs.docset', 'Contents', 'Resources', 'Documents'))
+        # remove examples
+        shutil.rmtree(path.join('threejs.docset', 'Contents', 'Resources', 'Documents', 'examples'))
 
     def _index_examples(self, cursor):
         items = []
