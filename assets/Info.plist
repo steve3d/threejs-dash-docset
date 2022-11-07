@@ -14,5 +14,7 @@
 	<true/>
 	<key>DashDocSetFamily</key>
 	<string>dashtoc</string>
+	 <key>DashDocSetFallbackURL</key>
+	<string>https://threejs.org</string>
 </dict>
 </plist>

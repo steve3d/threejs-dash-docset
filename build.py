@@ -80,15 +80,22 @@ class Builder:
 
         with open(path.join(self.cwd, 'output', 'docs', 'page.js'), 'r+', encoding='utf-8') as f:
             content = f.read().replace(r"pathname.substring( 0, pathname.indexOf( 'docs' ) + 4 ) + '/prettify", "'prettify")
-            content = content.replace('../examples/#$1', '../examples/$1.html')
+            content = content.replace('../examples/#$1', 'https://threejs.org/examples/$1.html')
             content = content.replace('window.location.replace(','// window.location.replace(') # prevent loading crash fixme: need a better fix
+            f.seek(0, 0)
+            f.truncate()
+            f.write(content)
+
+        with open(path.join(self.cwd, 'output', 'docs', 'index.html'), 'r+', encoding='utf-8') as f:
+            content = f.read()
+            content = re.sub(r'../examples/(.*)\"', r'https://threejs.org/examples/\1.html"',content)
             f.seek(0, 0)
             f.truncate()
             f.write(content)
 
         shutil.copy2(path.join(self.cwd, 'assets', 'icon.png'), path.join(self.cwd, 'threejs.docset'))
         shutil.copy2(path.join(self.cwd, 'assets', 'icon@2x.png'), path.join(self.cwd, 'threejs.docset'))
-        shutil.copy2(path.join(self.cwd, 'assets', 'info.plist'), path.join(self.cwd, 'threejs.docset', 'Contents'))
+        shutil.copy2(path.join(self.cwd, 'assets', 'Info.plist'), path.join(self.cwd, 'threejs.docset', 'Contents'))
         shutil.move(path.join(self.cwd, 'output'), path.join('threejs.docset', 'Contents', 'Resources', 'Documents'))
         # remove examples
         shutil.rmtree(path.join('threejs.docset', 'Contents', 'Resources', 'Documents', 'examples'))
@@ -97,7 +104,7 @@ class Builder:
         items = []
         for item in glob.glob(path.join(self.cwd, 'output', 'examples', '*.html')):
             filename = path.basename(item)
-            items.append((filename.replace('.html', ''), 'Sample', 'examples/' + filename))
+            items.append((filename.replace('.html', ''), 'Sample', 'https://threejs.org/examples/' + filename))
 
         cursor.executemany("INSERT INTO searchIndex(name, type, path) VALUES (?, ?, ?)", items)
 
@@ -158,13 +165,13 @@ class Builder:
 
     def build(self):
         os.chdir(self.src)
-        self._checkout()
-        self._buildSource()
+        # self._checkout()
+        # self._buildSource()
         self._copy()
         self._parse()
         self._index()
         self._gen_api_toc()  # generate TOC
-        # self._debug_db() # debug sqlite
+        self._debug_db() # debug sqlite
         print('Build documents for version: ' + self.version)
         pass
 
