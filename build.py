@@ -100,7 +100,7 @@ class Builder:
         cursor.executemany("INSERT INTO searchIndex(name, type, path) VALUES (?, ?, ?)", items)
 
     def _gen_api_toc(self):
-        for item in glob.glob(path.join('threejs.docset', 'Contents', 'Resources', 'Documents', 'docs/api/en/**/*.html')): #'docs/api/en/**/**/*.html')):
+        for item in glob.glob(path.join('threejs.docset', 'Contents', 'Resources', 'Documents', 'docs/api/en/**/*.html'), recursive=True): #'docs/api/en/**/**/*.html')):
             print('gen toc for:'+item)
             with open(item, 'r+', encoding='utf-8') as f:
                 filename = path.basename(item) 
