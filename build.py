@@ -152,6 +152,10 @@ class Builder:
 
         cursor.executemany("INSERT INTO searchIndex(name, type, path) VALUES (?, ?, ?)", items)
 
+
+    def _debug_db(self):
+        shutil.copy2(path.join(self.cwd, 'threejs.docset/Contents/Resources/docSet.dsidx'), path.join(self.cwd, 'threejs.docset/Contents/Resources/docSet.db'))
+
     def build(self):
         os.chdir(self.src)
         self._checkout()
@@ -159,10 +163,8 @@ class Builder:
         self._copy()
         self._parse()
         self._index()
-        # generate TOC
-        self._gen_api_toc()
-        # debug sqlite
-        # shutil.copy2(path.join(self.cwd, 'threejs.docset/Contents/Resources/docSet.dsidx'), path.join(self.cwd, 'threejs.docset/Contents/Resources/docSet.db'))
+        self._gen_api_toc()  # generate TOC
+        # self._debug_db() # debug sqlite
         print('Build documents for version: ' + self.version)
         pass
 
