@@ -163,15 +163,19 @@ class Builder:
     def _debug_db(self):
         shutil.copy2(path.join(self.cwd, 'threejs.docset/Contents/Resources/docSet.dsidx'), path.join(self.cwd, 'threejs.docset/Contents/Resources/docSet.db'))
 
+    def _packageOutput(self):
+        subprocess.run(['tar', '--exclude','.DS_Store', '-cvzf', 'threejs.tgz', 'threejs.docset'],cwd=self.cwd)
+
     def build(self):
         os.chdir(self.src)
-        # self._checkout()
-        # self._buildSource()
+        self._checkout()
+        self._buildSource()
         self._copy()
         self._parse()
         self._index()
         self._gen_api_toc()  # generate TOC
-        self._debug_db() # debug sqlite
+        self._packageOutput()
+        # self._debug_db() # debug sqlite
         print('Build documents for version: ' + self.version)
         pass
 
