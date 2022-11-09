@@ -11,6 +11,9 @@ import dirtyjson
 import sqlite3
 import glob
 
+
+
+
 class Builder:
     def __init__(self, lang, version):
         self.lang = lang
@@ -50,8 +53,9 @@ class Builder:
             shutil.rmtree(path.join(output, 'docs', name, removeLang))
 
     def _parse(self):
-        with open(path.join(self.cwd, 'output', 'docs', 'list.js'), encoding='utf-8') as f:
-            pages = f.read().replace('var list =', '')        
+        # now use list.json instead
+        with open(path.join(self.cwd, 'output', 'docs', 'list.json'), encoding='utf-8') as f:
+            pages = f.read()      
 
         self.items = dirtyjson.loads(pages)[self.lang]
 
@@ -76,23 +80,74 @@ class Builder:
 
         with open(path.join(self.cwd, 'output', 'docs', 'page.js'), 'r+', encoding='utf-8') as f:
             content = f.read().replace(r"pathname.substring( 0, pathname.indexOf( 'docs' ) + 4 ) + '/prettify", "'prettify")
-            content = content.replace('../examples/#$1', '../examples/$1.html')
+            content = content.replace('../examples/#$1', 'https://threejs.org/examples/$1.html')
+            content = content.replace('window.location.replace(','// window.location.replace(') # prevent loading crash fixme: need a better fix
+            f.seek(0, 0)
+            f.truncate()
+            f.write(content)
+
+        with open(path.join(self.cwd, 'output', 'docs', 'index.html'), 'r+', encoding='utf-8') as f:
+            content = f.read()
+            content = re.sub(r'../examples/(.*)\"', r'https://threejs.org/examples/\1.html"',content)
             f.seek(0, 0)
             f.truncate()
             f.write(content)
 
         shutil.copy2(path.join(self.cwd, 'assets', 'icon.png'), path.join(self.cwd, 'threejs.docset'))
         shutil.copy2(path.join(self.cwd, 'assets', 'icon@2x.png'), path.join(self.cwd, 'threejs.docset'))
-        shutil.copy2(path.join(self.cwd, 'assets', 'info.plist'), path.join(self.cwd, 'threejs.docset', 'Contents'))
+        shutil.copy2(path.join(self.cwd, 'assets', 'Info.plist'), path.join(self.cwd, 'threejs.docset', 'Contents'))
         shutil.move(path.join(self.cwd, 'output'), path.join('threejs.docset', 'Contents', 'Resources', 'Documents'))
+        # remove examples
+        shutil.rmtree(path.join('threejs.docset', 'Contents', 'Resources', 'Documents', 'examples'))
 
     def _index_examples(self, cursor):
         items = []
         for item in glob.glob(path.join(self.cwd, 'output', 'examples', '*.html')):
             filename = path.basename(item)
-            items.append((filename.replace('.html', ''), 'Sample', 'examples/' + filename))
+            items.append((filename.replace('.html', ''), 'Sample', 'https://threejs.org/examples/' + filename))
 
         cursor.executemany("INSERT INTO searchIndex(name, type, path) VALUES (?, ?, ?)", items)
+
+    def _gen_api_toc(self):
+        rootPath = path.join('threejs.docset', 'Contents', 'Resources', 'Documents')
+        allPath = glob.glob(path.join(rootPath, 'docs/api/en/**/*.html'), recursive=True) + glob.glob(path.join(rootPath, 'docs/examples/en/**/*.html'), recursive=True)
+        for item in allPath:
+            print('gen toc for:'+item)
+            with open(item, 'r+', encoding='utf-8') as f:
+                filename = path.basename(item) 
+                name = filename.replace('.html', '')
+
+                content = f.read()
+
+                # toc
+                def repl_toc_fn(matchobj):
+                    # g0 = matchobj.group(0)
+                    (g1,g2,g3,g0) = matchobj.group(2,3,4,1)
+                    # g1 返回值
+                    # g2 名称
+                    # g3 类型
+                    if g1 is None:
+                        g1 = ''
+                    if g2 is None:
+                        g2 = ''
+                    if g3 is None:
+                        g3 = ''
+                    if g0 is None:
+                        g0 = ''
+                    else:
+                        # uppercase g0's first letter
+                        g0 = g0[0].upper() + g0[1:]
+                    # g2 = matchobj.group(2)
+                    # print(g0,g1,g2,g3)
+                    # return g1+g2+g3
+                    return '<a onclick="window.parent.setUrlFragment(\'' + name + '.'+g2+'\')" target="_parent" title="' + name + '.'+g2+'" class="permalink">#</a> .<a onclick="window.parent.setUrlFragment(\'' + name + '.'+g2+'\')" id="'+g2+'">'+g2+'</a> '+g3+' : <a name="//apple_ref/cpp/'+g0+'/'+g2+'" class="param dashAnchor" onclick="window.parent.setUrlFragment(\''+g1+'\')">'+g1+'</a>'
+
+                content_new = re.sub(r"\[(member|property|method):([\w]+) ([\w\.\s]+)\]\s*(\(.*\))?", repl_toc_fn, content, flags=re.M)
+                
+                f.seek(0, 0)
+                f.truncate()
+                f.write(content_new)
+                # print(content_new)
         
 
     def _index_group(self, groups, type, cursor):
@@ -100,8 +155,16 @@ class Builder:
         for group in groups.items():
             for item in group[1].items():
                 items.append((item[0], type, 'docs/' + item[1] + '.html'))
+                # items.append((item[0], type, 'https://threejs.org/docs/' + item[1] + '.html'))
 
         cursor.executemany("INSERT INTO searchIndex(name, type, path) VALUES (?, ?, ?)", items)
+
+
+    def _debug_db(self):
+        shutil.copy2(path.join(self.cwd, 'threejs.docset/Contents/Resources/docSet.dsidx'), path.join(self.cwd, 'threejs.docset/Contents/Resources/docSet.db'))
+
+    def _packageOutput(self):
+        subprocess.run(['tar', '--exclude','.DS_Store', '-cvzf', 'threejs.tgz', 'threejs.docset'],cwd=self.cwd)
 
     def build(self):
         os.chdir(self.src)
@@ -110,6 +173,9 @@ class Builder:
         self._copy()
         self._parse()
         self._index()
+        self._gen_api_toc()  # generate TOC
+        self._packageOutput()
+        # self._debug_db() # debug sqlite
         print('Build documents for version: ' + self.version)
         pass
 
